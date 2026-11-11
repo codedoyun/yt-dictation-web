@@ -13,6 +13,14 @@
 
   // ================= 1. 유튜브가 받아오는 자막 응답 엿보기 (페이지 영역일 때만 가능) =================
   const ttCache = []; // {v, lang, kind, tlang, body}
+  // 유튜브 플레이어가 요청한 자막 주소(보안 토큰 pot 포함)를 기록 — 페이지 영역이 아니어도 볼 수 있음
+  const ttUrls = [];
+  function noteUrl(u) { if (u && u.includes('/api/timedtext') && !ttUrls.includes(u)) { ttUrls.push(u); if (ttUrls.length > 50) ttUrls.shift(); } }
+  try {
+    if (performance.setResourceTimingBufferSize) performance.setResourceTimingBufferSize(2000);
+    performance.getEntriesByType('resource').forEach(e => noteUrl(e.name));
+    new PerformanceObserver(list => list.getEntries().forEach(e => noteUrl(e.name))).observe({ type: 'resource', buffered: true });
+  } catch (e) { /* ignore */ }
   const ttListeners = [];
   function onTimedText(url, body) {
     if (!body || body.length < 20) return;
@@ -138,6 +146,31 @@
       } catch (e) { log.push('C:오류'); }
     } else log.push('C:영어트랙없음');
 
+    // F. 플레이어가 이미 요청했던 자막 주소(토큰 포함)를 재사용
+    async function tryRecorded() {
+      try { performance.getEntriesByType('resource').forEach(e => noteUrl(e.name)); } catch (e) { /* ignore */ }
+      const urls = ttUrls.filter(u => u.includes('v=' + videoId)).reverse();
+      for (const raw of urls) {
+        try {
+          const u = new URL(raw, location.href);
+          u.searchParams.delete('tlang');
+          u.searchParams.set('fmt', 'json3');
+          if (track && !/^en\b/i.test(u.searchParams.get('lang') || '')) {
+            u.searchParams.set('lang', track.languageCode);
+            if (track.kind) u.searchParams.set('kind', track.kind); else u.searchParams.delete('kind');
+          }
+          const isAuto = u.searchParams.get('kind') === 'asr';
+          const body = await (await origFetch(u.toString(), { credentials: 'include' })).text();
+          const s = body.length > 20 ? segsFrom(body, isAuto) : [];
+          if (s.length) return { segments: s, auto: isAuto };
+        } catch (e) { /* 다음 주소 */ }
+      }
+      return null;
+    }
+    let rec = await tryRecorded();
+    if (rec) return { ...rec, source: 'F1' };
+    log.push('F1:' + ttUrls.filter(u => u.includes('v=' + videoId)).length);
+
     // E. 유튜브 '스크립트 표시' 기능으로 가져오기
     try {
       const dec = decodeHex(html);
@@ -167,6 +200,22 @@
         }
       }
     } catch (e) { log.push('E:오류'); }
+
+    // F2. 플레이어의 CC 버튼을 대신 눌러서 자막을 요청하게 만든 뒤, 그 주소를 재사용
+    if (track) {
+      const btn = document.querySelector('.ytp-subtitles-button, button.ytmClosedCaptioningButtonButton, ytm-closed-captioning-button button, button[aria-label*="aption"], button[aria-label*="자막"]');
+      if (btn) {
+        const before = ttUrls.length;
+        try { btn.click(); } catch (e) { /* ignore */ }
+        for (let i = 0; i < 25 && ttUrls.length === before; i++) {
+          await new Promise(r => setTimeout(r, 200));
+          try { performance.getEntriesByType('resource').forEach(e => noteUrl(e.name)); } catch (e) { /* ignore */ }
+        }
+        rec = await tryRecorded();
+        if (rec) return { ...rec, source: 'F2' };
+        log.push('F2:실패');
+      } else log.push('F2:CC버튼없음');
+    }
 
     // D. 유튜브 플레이어의 자막을 켜서 받아오기 (페이지 영역일 때만)
     if (isPage() && track) {
@@ -343,7 +392,7 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
       if (S.on) start();
     } else {
       S.status = 'error';
-      S.msg = r.noTrack ? '이 영상에는 영어 자막이 없는 것 같아요.' : '자막을 가져오지 못했어요. 영상의 자막(CC) 버튼을 켰다가 ✕로 닫고 다시 열어 보세요.';
+      S.msg = r.noTrack ? '이 영상에는 영어 자막이 없는 것 같아요.' : '자막을 가져오지 못했어요. 영상을 잠깐 재생하고 자막(CC)을 켠 다음, ✕로 닫고 받아쓰기를 다시 눌러 보세요.';
       if (isPage()) { // 사용자가 CC를 켜면 자동으로 다시 시도
         ttListeners.push(item => { if (S.status === 'error' && item.v === S.videoId && /^en\b/i.test(item.lang) && !item.tlang) { S.status = 'idle'; if (S.on) load(); } });
       }

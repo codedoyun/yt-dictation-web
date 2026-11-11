@@ -38,6 +38,7 @@ ytcfg.set({{"INNERTUBE_API_KEY":"KEY123","INNERTUBE_CONTEXT":{{"client":{{"clien
 <div id="player-container-id"><div id="movie_player" class="html5-video-player">
   <video class="video-stream html5-main-video" src="/video.webm" muted playsinline></video>
   <div class="ytp-caption-window-container" style="position:absolute;top:0;color:#fff">YT CAPTION</div>
+  <button class="ytp-subtitles-button" style="position:absolute;right:0;top:0" onclick="var x=new XMLHttpRequest();x.open('GET','/api/timedtext?v=TESTVIDEO01&lang=en&tlang=vi&fmt=srv3&pot=abc');x.send();">CC</button>
 </div></div>
 <div class="content">Title and comments…</div>
 <script nonce="n4">

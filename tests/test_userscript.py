@@ -80,6 +80,7 @@ try:
         run(b, p, 'pot')
         run(b, p, 'none')
         run(b, p, 'pot', force_content=True)
+        run(b, p, 'none', force_content=True)
         b.close()
     print('USERSCRIPT TESTS PASSED')
 finally:
