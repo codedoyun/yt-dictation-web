@@ -226,6 +226,13 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
 #ytd-panel .ytd-tools button { padding: 8px 0; border-radius: 10px; border: 1px solid #262c38; background: #151922; color: #e8eaef; font-size: 17px; line-height: 1.1; }
 #ytd-panel .ytd-tools button span { display: block; font-size: 10px; color: #8b93a3; margin-top: 2px; }
 #ytd-panel .ytd-tools button:disabled { opacity: .35; }
+#ytd-panel.ytd-kb .ytd-bar { order: 0; }
+#ytd-panel.ytd-kb .ytd-tools { order: 1; padding: 0 10px 6px; }
+#ytd-panel.ytd-kb .ytd-wrap { order: 2; }
+#ytd-panel.ytd-kb .ytd-msg { order: 3; padding: 3px 14px; font-size: 12px; }
+#ytd-panel.ytd-kb .ytd-log { order: 4; }
+#ytd-panel.ytd-kb .ytd-tools button { padding: 6px 0; }
+#ytd-panel .ytd-scroll { overscroll-behavior: contain; }
 `;
 
   function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
@@ -259,6 +266,7 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
     ['click', 'touchstart', 'touchend', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'keydown', 'keyup', 'keypress'].forEach(t =>
       panel.addEventListener(t, e => e.stopPropagation()));
 
+    panel.addEventListener('touchmove', e => { if (!ui.scroll.contains(e.target) || panel.classList.contains('ytd-kb')) e.preventDefault(); }, { passive: false });
     ui.input.addEventListener('input', sync);
     ui.input.addEventListener('compositionstart', () => { S.composing = true; });
     ui.input.addEventListener('compositionend', () => { S.composing = false; sync(); });
@@ -272,10 +280,20 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
   }
 
   // 패널 위치: 영상 바로 아래부터 (키보드 위) 화면 끝까지
+  const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   function layout() {
     if (!panel || panel.style.display === 'none') return;
     const vv = window.visualViewport;
     const vTop = vv ? vv.offsetTop : 0, vH = vv ? vv.height : window.innerHeight;
+    // 키보드가 올라와 있으면: 화면(보이는 영역) 전체에 고정, 버튼은 위쪽에 → 스크롤해도 안 움직이고 키보드 위 바에 안 가려짐
+    const kb = !!(S.focused && vv && (window.innerHeight - vH > 120 || window.__ytdKb));
+    panel.classList.toggle('ytd-kb', kb);
+    if (kb) {
+      const gap = IS_IOS ? 64 : 0; // 아이폰 키보드 위의 ∧∨✓ 바가 화면을 덮는 높이
+      panel.style.top = vTop + 'px';
+      panel.style.height = Math.max(160, vH - gap) + 'px';
+      return;
+    }
     const v = getVideo();
     const p = (v && (v.closest('#player-container-id') || v.closest('.html5-video-player'))) || v;
     let top = p ? p.getBoundingClientRect().bottom : vTop;

@@ -59,6 +59,14 @@ def run(b, p, mode, force_content=False, full=False):
         wait(page, '__ytdUS.S.awaiting')
         E(page, 'document.querySelector("video").currentTime = 4.5;')
         wait(page, '__ytdUS.S.target === 1')
+        # 키보드가 올라온 상태 흉내 → 화면 맨 위에 고정, 버튼이 문장 칸 위에, 아래 64px 비움
+        E(page, 'document.querySelector("#ytd-panel .ytd-in").focus(); window.__ytdKb = true;')
+        page.wait_for_function('() => document.getElementById("ytd-panel").classList.contains("ytd-kb")')
+        geo = E(page, 'const P=document.getElementById("ytd-panel").getBoundingClientRect(), T=document.querySelector("#ytd-panel .ytd-tools").getBoundingClientRect(), W=document.querySelector("#ytd-panel .ytd-wrap").getBoundingClientRect(); return {pt:P.top, pb:P.bottom, tb:T.bottom, wt:W.top, h:visualViewport.height}')
+        print('kb layout', geo)
+        assert abs(geo['pt']) < 1 and geo['tb'] <= geo['wt'] and abs(geo['pb'] - (geo['h'] - 64)) < 2, geo
+        page.screenshot(path=os.path.join(HERE, 'us_kb.png'))
+        E(page, 'window.__ytdKb = false;')
         page.click('#ytd-panel .ytd-x')
         assert E(page, 'return document.getElementById("ytd-panel").style.display') == 'none'
         assert E(page, 'return getComputedStyle(document.getElementById("ytd-fab")).display') != 'none'
