@@ -18,6 +18,11 @@ TRANSCRIPT = json.dumps({"actions": [{"updateEngagementPanelAction": {"content":
         {"transcriptSegmentRenderer": {"startMs": "8000", "endMs": "10000", "snippet": {"runs": [{"text": "It's a well-known fact."}]}}},
     ]}}}}}}}}]})
 
+CAPS_KO = json.dumps({"events": [
+    {"tStartMs": 1000, "dDurationMs": 2000, "segs": [{"utf8": "안녕, 세상아!"}]},
+    {"tStartMs": 4000, "dDurationMs": 2000, "segs": [{"utf8": "모르겠어."}]},
+    {"tStartMs": 8000, "dDurationMs": 2000, "segs": [{"utf8": "잘 알려진 사실이야."}]},
+]})
 PR = {"videoDetails": {"videoId": "TESTVIDEO01"}, "captions": {"playerCaptionsTracklistRenderer": {"captionTracks": [
     {"baseUrl": "/api/timedtext?v=TESTVIDEO01&lang=ko", "languageCode": "ko"},
     {"baseUrl": "/api/timedtext?v=TESTVIDEO01&lang=en&kind=asr", "languageCode": "en", "kind": "asr"},
@@ -29,6 +34,7 @@ INITIAL_DATA_HEX = ''.join('\\x%02x' % ord(c) if c in '{}"\'\\<>=&' else c for c
 def page():
     return f"""<!doctype html><html><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width, initial-scale=1">
+<meta name="apple-itunes-app" content="app-id=544007664">
 <style>body{{margin:0;background:#fff;font-family:sans-serif}} #player-container-id{{position:sticky;top:0;width:100%;aspect-ratio:16/9;background:#000;z-index:5}}
 video{{width:100%;height:100%}} .content{{height:2000px;padding:10px}}</style></head><body>
 <script nonce="n1">var ytInitialPlayerResponse = {json.dumps(PR)};</script>
@@ -70,7 +76,7 @@ class H(http.server.BaseHTTPRequestHandler):
             # 실제 유튜브처럼 Trusted Types 강제 (innerHTML 쓰면 오류)
             return self.out(200, page(), 'text/html; charset=utf-8', {'Content-Security-Policy': "require-trusted-types-for 'script'"})
         if u.path == '/api/timedtext':
-            if MODE['m'] == 'ok' or 'pot' in q: return self.out(200, CAPS, 'application/json')
+            if MODE['m'] == 'ok' or 'pot' in q: return self.out(200, CAPS_KO if 'ko' in (q.get('tlang', [''])[0], q.get('lang', [''])[0]) else CAPS, 'application/json')
             return self.out(200, '', 'application/json')
         if u.path == '/video.webm':
             data = open(os.path.join(HERE, 'video.webm'), 'rb').read()

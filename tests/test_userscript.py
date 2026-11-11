@@ -34,6 +34,13 @@ def run(b, p, mode, force_content=False, full=False):
     print(f'[{mode}{" content" if force_content else ""}] {src}')
     assert E(page, 'return __ytdUS.S.segs.length') == 3
     assert E(page, 'return getComputedStyle(document.querySelector(".ytp-caption-window-container")).display') == 'none'
+    assert E(page, 'return document.querySelectorAll(\'meta[name="apple-itunes-app"]\').length') == 0
+    if mode in ('ok', 'none'):
+        wait(page, '__ytdUS.S.koState === "ok"')
+        page.click('#ytd-panel button[data-act=ko]')
+        ko = E(page, 'return document.querySelector("#ytd-panel .ytd-ko").textContent')
+        print('  해석:', ko); assert ko == '안녕, 세상아!', ko
+        page.click('#ytd-panel button[data-act=ko]')
     wait(page, '__ytdUS.S.awaiting')
     t = E(page, 'return document.querySelector("video").currentTime'); assert 3.05 <= t <= 3.3, t
     # 패널이 영상 아래에 있는지
@@ -64,7 +71,10 @@ def run(b, p, mode, force_content=False, full=False):
         page.wait_for_function('() => document.getElementById("ytd-panel").classList.contains("ytd-kb")')
         geo = E(page, 'const P=document.getElementById("ytd-panel").getBoundingClientRect(), T=document.querySelector("#ytd-panel .ytd-tools").getBoundingClientRect(), W=document.querySelector("#ytd-panel .ytd-wrap").getBoundingClientRect(); return {pt:P.top, pb:P.bottom, tb:T.bottom, wt:W.top, h:visualViewport.height}')
         print('kb layout', geo)
-        assert abs(geo['pt']) < 1 and geo['tb'] <= geo['wt'] and abs(geo['pb'] - (geo['h'] - 64)) < 2, geo
+        assert abs(geo['pt']) < 1 and geo['tb'] <= geo['wt'] and abs(geo['pb'] - geo['h']) < 2, geo
+        mini = E(page, 'const c=document.querySelector("#ytd-panel .ytd-mini"); return [getComputedStyle(c).display, c.width, c.clientHeight]')
+        print('mini video', mini)
+        assert mini[0] == 'block' and mini[1] > 0 and mini[2] > 50, mini
         page.screenshot(path=os.path.join(HERE, 'us_kb.png'))
         E(page, 'window.__ytdKb = false;')
         page.click('#ytd-panel .ytd-x')

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube 받아쓰기
 // @namespace    https://github.com/codedoyun
-// @version      0.1.4
+// @version      0.1.6
 // @description  유튜브 영어 대사를 듣고 한 글자씩 받아쓰는 듣기 연습
 // @match        https://m.youtube.com/*
 // @match        https://www.youtube.com/*
@@ -352,6 +352,18 @@
     };
   } catch (e) { /* ignore */ }
 
+  // 사파리 상단 'YouTube 앱에서 열기' 배너의 원인(meta 태그)을 페이지가 읽기 전에 지움
+  function killAppBanner(root) {
+    (root.querySelectorAll ? root.querySelectorAll('meta[name="apple-itunes-app"]') : []).forEach(m => m.remove());
+  }
+  try {
+    killAppBanner(document);
+    new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => {
+      if (n.nodeType !== 1) return;
+      if (n.tagName === 'META' && n.getAttribute('name') === 'apple-itunes-app') n.remove(); else killAppBanner(n);
+    }))).observe(document, { childList: true, subtree: true });
+  } catch (e) { /* ignore */ }
+
   // ================= 2. 자막 가져오기 =================
   // 자바스크립트 문자열('...') 안의 이스케이프(\x22, \', \\ 등)를 풀기
   function unescapeJs(inner) {
@@ -402,6 +414,41 @@
     return en[0] || null;
   }
 
+  const last = { track: null, tracks: [], videoId: null };
+
+  // 한글 해석 자막 가져오기: 한국어 자막 트랙 → 없으면 유튜브 자동번역(tlang=ko)
+  async function loadKorean(videoId, segs, okUrl) {
+    const cands = [];
+    const ko = (last.tracks || []).find(t => /^ko\b/i.test(t.languageCode || '') && t.kind !== 'asr');
+    const withFmt = (raw, extra) => { try { const u = new URL(raw, location.href); u.searchParams.set('fmt', 'json3'); u.searchParams.delete('tlang'); Object.entries(extra || {}).forEach(([k, v]) => u.searchParams.set(k, v)); return u.toString(); } catch (e) { return null; } };
+    if (ko && ko.baseUrl) cands.push(withFmt(ko.baseUrl));
+    if (okUrl) cands.push(withFmt(okUrl, { tlang: 'ko' }));
+    ttUrls.filter(u => u.includes('v=' + videoId) && u.includes('pot=')).reverse().forEach(u => {
+      if (ko) cands.push(withFmt(u, { lang: 'ko', kind: '' }).replace(/([?&])kind=(&|$)/, '$1'));
+      cands.push(withFmt(u, last.track ? { lang: last.track.languageCode, ...(last.track.kind ? { kind: last.track.kind } : {}), tlang: 'ko' } : { tlang: 'ko' }));
+    });
+    if (last.track && last.track.baseUrl) cands.push(withFmt(last.track.baseUrl, { tlang: 'ko' }));
+    for (const url of cands.filter(Boolean)) {
+      try {
+        const body = await (await origFetch(url, { credentials: 'include' })).text();
+        if (body.length < 20) continue;
+        const parsed = C.parseCaptionBody(body);
+        const cues = (parsed && parsed.cues || []).map(c => ({ start: c.start, end: c.end, text: C.cleanText(c.text) })).filter(c => c.text);
+        if (!cues.length) continue;
+        // 시간이 겹치는 한국어 자막을 각 문장에 붙임
+        let hit = 0;
+        segs.forEach(sg => {
+          const end = Math.max(sg.pauseAt, sg.end);
+          const parts = cues.filter(c => { const mid = (c.start + c.end) / 2; return mid >= sg.start - 0.2 && mid <= end + 0.2; }).map(c => c.text);
+          sg.ko = [...new Set(parts)].join(' ');
+          if (sg.ko) hit++;
+        });
+        if (hit) return true;
+      } catch (e) { /* 다음 후보 */ }
+    }
+    return false;
+  }
+
   function player() { return document.getElementById('movie_player') || document.querySelector('.html5-video-player'); }
 
   // 결과: { segments, source, track } 또는 오류(로그 포함)
@@ -426,6 +473,7 @@
     } catch (e) { log.push('B:페이지오류'); }
     const tracks = pr ? walk(pr, 'captionTracks', [])[0] || [] : [];
     const track = pickTrack(tracks);
+    last.track = track; last.tracks = tracks; last.videoId = videoId;
     log.push('B:' + (pr ? '트랙' + tracks.length : '정보없음'));
 
     // C. 자막 주소로 직접 요청
@@ -435,7 +483,7 @@
         url = /[?&]fmt=/.test(url) ? url.replace(/([?&]fmt=)[^&]*/, '$1json3') : url + '&fmt=json3';
         const body = await (await origFetch(url, { credentials: 'include' })).text();
         const s = body.length > 20 ? segsFrom(body, track.kind === 'asr') : [];
-        if (s.length) return { segments: s, source: 'C', auto: track.kind === 'asr' };
+        if (s.length) return { segments: s, source: 'C', auto: track.kind === 'asr', url };
         log.push('C:빈응답');
       } catch (e) { log.push('C:오류'); }
     } else log.push('C:영어트랙없음');
@@ -456,7 +504,7 @@
           const isAuto = u.searchParams.get('kind') === 'asr';
           const body = await (await origFetch(u.toString(), { credentials: 'include' })).text();
           const s = body.length > 20 ? segsFrom(body, isAuto) : [];
-          if (s.length) return { segments: s, auto: isAuto };
+          if (s.length) return { segments: s, auto: isAuto, url: u.toString() };
         } catch (e) { /* 다음 주소 */ }
       }
       return null;
@@ -562,18 +610,22 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
 #ytd-panel .ghost, #ytd-panel .sepb { color: #5b6474; }
 #ytd-panel .cur::after { content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 3px; background: #3b82f6; animation: ytdblink 1s steps(1) infinite; }
 @keyframes ytdblink { 50% { opacity: 0; } }
+#ytd-panel .ytd-ko { margin-top: 8px; font-size: 16px; line-height: 1.5; color: #a5b4fc; }
 #ytd-panel .ytd-msg { padding: 5px 14px; font-size: 13px; color: #8b93a3; flex-shrink: 0; min-height: 1.6em; }
 #ytd-panel.ytd-done .ytd-msg { color: #6ee7b7; font-weight: 700; }
 #ytd-panel .ytd-log { font-size: 11px; color: #6b7280; padding: 0 14px 4px; word-break: break-all; }
-#ytd-panel .ytd-tools { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; padding: 0 10px calc(8px + env(safe-area-inset-bottom)); flex-shrink: 0; }
+#ytd-panel .ytd-tools { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; padding: 0 10px calc(8px + env(safe-area-inset-bottom)); flex-shrink: 0; }
 #ytd-panel .ytd-tools button { padding: 8px 0; border-radius: 10px; border: 1px solid #262c38; background: #151922; color: #e8eaef; font-size: 17px; line-height: 1.1; }
-#ytd-panel .ytd-tools button span { display: block; font-size: 10px; color: #8b93a3; margin-top: 2px; }
+#ytd-panel .ytd-tools button span { display: block; font-size: 10px; white-space: nowrap; color: #8b93a3; margin-top: 2px; }
 #ytd-panel .ytd-tools button:disabled { opacity: .35; }
-#ytd-panel.ytd-kb .ytd-bar { order: 0; }
-#ytd-panel.ytd-kb .ytd-tools { order: 1; padding: 0 10px 6px; }
-#ytd-panel.ytd-kb .ytd-wrap { order: 2; }
-#ytd-panel.ytd-kb .ytd-msg { order: 3; padding: 3px 14px; font-size: 12px; }
+#ytd-panel .ytd-mini { display: none; width: 100%; background: #000; flex-shrink: 0; }
+#ytd-panel.ytd-kb .ytd-mini { display: block; order: -1; }
+#ytd-panel.ytd-kb .ytd-bar { order: 0; padding: 3px 12px; }
+#ytd-panel.ytd-kb .ytd-tools { order: 1; padding: 0 10px 4px; }
+#ytd-panel.ytd-kb .ytd-msg { order: 2; padding: 0 14px 3px; font-size: 12px; min-height: 0; }
+#ytd-panel.ytd-kb .ytd-wrap { order: 3; margin-bottom: 4px; }
 #ytd-panel.ytd-kb .ytd-log { order: 4; }
+#ytd-panel.ytd-kb .ytd-scroll { padding-bottom: var(--ytd-kbpad, 0px); }
 #ytd-panel.ytd-kb .ytd-tools button { padding: 6px 0; }
 #ytd-panel .ytd-scroll { overscroll-behavior: contain; }
 `;
@@ -591,20 +643,22 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
     ui.prog = el('span', 'ytd-prog'); ui.stat = el('span', 'ytd-stat');
     const x = el('button', 'ytd-x', '✕'); x.type = 'button'; x.addEventListener('click', () => toggle(false));
     bar.append(ui.prog, ui.stat, x);
-    const wrap = el('div', 'ytd-wrap'); ui.scroll = el('div', 'ytd-scroll'); ui.line = el('div', 'ytd-line'); ui.scroll.appendChild(ui.line);
+    const wrap = el('div', 'ytd-wrap'); ui.scroll = el('div', 'ytd-scroll'); ui.line = el('div', 'ytd-line'); ui.ko = el('div', 'ytd-ko');
+    ui.scroll.append(ui.line, ui.ko);
     ui.input = el('input', 'ytd-in');
     Object.assign(ui.input, { type: 'text', autocomplete: 'off', spellcheck: false });
     ui.input.setAttribute('autocorrect', 'off'); ui.input.setAttribute('autocapitalize', 'off'); ui.input.setAttribute('enterkeyhint', 'go');
     wrap.append(ui.scroll, ui.input);
     ui.msg = el('div', 'ytd-msg'); ui.log = el('div', 'ytd-log');
     ui.tools = el('div', 'ytd-tools');
-    [['replay', '↺', '다시'], ['slow', '🐢', '느리게'], ['hint', '💡', '한 글자'], ['reveal', '👁', '정답'], ['prev', '⏮', '이전'], ['next', '⏭', '다음']].forEach(([act, ic, lb]) => {
+    [['replay', '↺', '다시'], ['slow', '🐢', '느리게'], ['hint', '💡', '한 글자'], ['reveal', '👁', '정답'], ['ko', '가', '해석'], ['prev', '⏮', '이전'], ['next', '⏭', '다음']].forEach(([act, ic, lb]) => {
       const b = el('button', '', ic); b.type = 'button'; b.dataset.act = act; b.appendChild(el('span', '', lb));
       b.addEventListener('mousedown', e => e.preventDefault()); // 키보드 내려가지 않게
       b.addEventListener('click', () => action(act));
       ui.tools.appendChild(b);
     });
-    panel.append(bar, wrap, ui.msg, ui.log, ui.tools);
+    ui.canvas = el('canvas', 'ytd-mini');
+    panel.append(ui.canvas, bar, wrap, ui.msg, ui.log, ui.tools);
     // 패널 터치가 유튜브 쪽으로 전달되지 않게
     ['click', 'touchstart', 'touchend', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'keydown', 'keyup', 'keypress'].forEach(t =>
       panel.addEventListener(t, e => e.stopPropagation()));
@@ -623,6 +677,21 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
   }
 
   // 패널 위치: 영상 바로 아래부터 (키보드 위) 화면 끝까지
+  // 키보드가 올라와 영상이 가려질 때, 패널 맨 위에 영상을 작게 그려서 보여줌
+  let miniBroken = false;
+  function drawMini() {
+    const v = getVideo(), c = ui.canvas;
+    if (!v || miniBroken || !v.videoWidth) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const W = Math.round(c.clientWidth * dpr), H = Math.round(c.clientHeight * dpr);
+    if (!W || !H) return;
+    if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+    const ctx = c.getContext('2d');
+    const scale = Math.min(W / v.videoWidth, H / v.videoHeight);
+    const dw = v.videoWidth * scale, dh = v.videoHeight * scale;
+    try { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); ctx.drawImage(v, (W - dw) / 2, (H - dh) / 2, dw, dh); }
+    catch (e) { miniBroken = true; c.style.display = 'none'; }
+  }
   const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   function layout() {
     if (!panel || panel.style.display === 'none') return;
@@ -631,10 +700,15 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
     // 키보드가 올라와 있으면: 화면(보이는 영역) 전체에 고정, 버튼은 위쪽에 → 스크롤해도 안 움직이고 키보드 위 바에 안 가려짐
     const kb = !!(S.focused && vv && (window.innerHeight - vH > 120 || window.__ytdKb));
     panel.classList.toggle('ytd-kb', kb);
+    panel.style.setProperty('--ytd-kbpad', IS_IOS ? '64px' : '0px');
     if (kb) {
-      const gap = IS_IOS ? 64 : 0; // 아이폰 키보드 위의 ∧∨✓ 바가 화면을 덮는 높이
       panel.style.top = vTop + 'px';
-      panel.style.height = Math.max(160, vH - gap) + 'px';
+      panel.style.height = Math.max(160, vH) + 'px';
+      // 영상 미니 화면 높이: 화면의 28% 정도
+      const w = panel.clientWidth || window.innerWidth;
+      const ch = Math.round(Math.min(vH * 0.28, w * 9 / 16));
+      if (ui.canvas.style.height !== ch + 'px') ui.canvas.style.height = ch + 'px';
+      drawMini();
       return;
     }
     const v = getVideo();
@@ -683,6 +757,8 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
     if (id !== S.videoId) return;
     if (r.segments.length) {
       S.segs = r.segments; S.auto = r.auto; S.status = 'ready'; S.log.push('OK:' + r.source);
+      S.koState = 'loading';
+      loadKorean(id, r.segments, r.url).then(ok => { if (id === S.videoId) { S.koState = ok ? 'ok' : 'none'; render(); } });
       if (S.on) start();
     } else {
       S.status = 'error';
@@ -700,7 +776,7 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
     S.target = i;
     S.typing = i < S.segs.length ? C.createTyping(S.segs[i].text) : null;
     S.hintSet = new Set(); S.hintCount = 0; S.mistakes = 0; S.lastErrKey = null;
-    S.awaiting = false; S.completing = false; S.hangul = false;
+    S.awaiting = false; S.completing = false; S.hangul = false; S.showKo = false;
     setValue('');
     render();
   }
@@ -815,6 +891,7 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
     else if (act === 'prev') goTo(S.target - 1);
     else if (act === 'hint') doHint();
     else if (act === 'reveal' && S.typing) { S.typing.revealed = true; render(); }
+    else if (act === 'ko' && S.typing) { S.showKo = !S.showKo; render(); }
   }
 
   // ---------- 그리기 (DOM 직접 생성) ----------
@@ -847,7 +924,8 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
     const c = sc.querySelector('.bad') || sc.querySelector('.at');
     if (!c) { sc.scrollTop = 0; return; }
     const r = c.getBoundingClientRect(), s = sc.getBoundingClientRect();
-    if (r.bottom > s.bottom - 6) sc.scrollTop += r.bottom - s.bottom + r.height * 0.6;
+    const pad = panel.classList.contains('ytd-kb') && IS_IOS ? 64 : 0;
+    if (r.bottom > s.bottom - 6 - pad) sc.scrollTop += r.bottom - (s.bottom - pad) + r.height * 0.6;
     else if (r.top < s.top + 4) sc.scrollTop -= s.top - r.top + r.height * 0.3;
   }
 
@@ -859,6 +937,10 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
     ui.prog.textContent = ready ? `${Math.min(S.target + 1, total)} / ${total}${S.auto ? ' · 자동자막' : ''}` : '';
     ui.stat.textContent = st && ready ? `오타 ${S.mistakes} · 힌트 ${S.hintCount}${st.revealed ? ' · 정답 봄' : ''}` : '';
     ui.line.replaceChildren(ready && st ? renderLine(st) : document.createTextNode(''));
+    const seg = S.segs[S.target];
+    ui.ko.textContent = ready && st && S.showKo
+      ? (seg && seg.ko ? seg.ko : S.koState === 'loading' ? '한글 해석 불러오는 중…' : '이 영상은 한글 해석을 가져오지 못했어요')
+      : '';
     keepCursorVisible();
     panel.classList.toggle('ytd-done', !!S.completing);
     ui.tools.querySelectorAll('button').forEach(b => { b.disabled = !ready || (!st && !['prev', 'replay'].includes(b.dataset.act)); });
@@ -879,6 +961,7 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
   // ================= 5. 시작 =================
   function boot() {
     if (!document.body) return setTimeout(boot, 100);
+    killAppBanner(document);
     buildUI();
     setInterval(() => {
       const id = urlVideoId();
