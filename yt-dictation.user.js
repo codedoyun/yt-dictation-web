@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube 받아쓰기
 // @namespace    https://github.com/codedoyun
-// @version      0.1.8
+// @version      0.1.9
 // @description  유튜브 영어 대사를 듣고 한 글자씩 받아쓰는 듣기 연습
 // @match        https://m.youtube.com/*
 // @match        https://www.youtube.com/*
@@ -352,18 +352,6 @@
     };
   } catch (e) { /* ignore */ }
 
-  // 사파리 상단 'YouTube 앱에서 열기' 배너의 원인(meta 태그)을 페이지가 읽기 전에 지움
-  function killAppBanner(root) {
-    (root.querySelectorAll ? root.querySelectorAll('meta[name="apple-itunes-app"]') : []).forEach(m => m.remove());
-  }
-  try {
-    killAppBanner(document);
-    new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => {
-      if (n.nodeType !== 1) return;
-      if (n.tagName === 'META' && n.getAttribute('name') === 'apple-itunes-app') n.remove(); else killAppBanner(n);
-    }))).observe(document, { childList: true, subtree: true });
-  } catch (e) { /* ignore */ }
-
   // ================= 2. 자막 가져오기 =================
   // 자바스크립트 문자열('...') 안의 이스케이프(\x22, \', \\ 등)를 풀기
   function unescapeJs(inner) {
@@ -653,7 +641,7 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
     wrap.append(ui.scroll, ui.input);
     ui.msg = el('div', 'ytd-msg'); ui.log = el('div', 'ytd-log');
     ui.tools = el('div', 'ytd-tools');
-    [['replay', '↺', '다시'], ['slow', '🐢', '느리게'], ['hint', '💡', '한 글자'], ['reveal', '👁', '정답'], ['ko', '가', '해석'], ['prev', '⏮', '이전'], ['next', '⏭', '다음']].forEach(([act, ic, lb]) => {
+    [['prev', '⏮', '이전'], ['next', '⏭', '다음'], ['slow', '🐢', '느리게'], ['hint', '💡', '한 글자'], ['reveal', '👁', '정답'], ['ko', '가', '해석'], ['replay', '↺', '다시']].forEach(([act, ic, lb]) => {
       const b = el('button', '', ic); b.type = 'button'; b.dataset.act = act; b.appendChild(el('span', '', lb));
       b.addEventListener('mousedown', e => e.preventDefault()); // 키보드 내려가지 않게
       b.addEventListener('click', () => action(act));
@@ -973,7 +961,6 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
   // ================= 5. 시작 =================
   function boot() {
     if (!document.body) return setTimeout(boot, 100);
-    killAppBanner(document);
     buildUI();
     setInterval(() => {
       const id = urlVideoId();

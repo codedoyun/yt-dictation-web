@@ -34,7 +34,6 @@ def run(b, p, mode, force_content=False, full=False):
     print(f'[{mode}{" content" if force_content else ""}] {src}')
     assert E(page, 'return __ytdUS.S.segs.length') == 3
     assert E(page, 'return getComputedStyle(document.querySelector(".ytp-caption-window-container")).display') == 'none'
-    assert E(page, 'return document.querySelectorAll(\'meta[name="apple-itunes-app"]\').length') == 0
     if mode in ('ok', 'none'):
         wait(page, '__ytdUS.S.koState === "ok"')
         page.click('#ytd-panel button[data-act=ko]')
@@ -98,3 +97,4 @@ try:
     print('USERSCRIPT TESTS PASSED')
 finally:
     srv.terminate()
+
