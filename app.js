@@ -336,7 +336,7 @@
       } else if (it.kind === 'sep') { cls = 'sepb'; txt = it.display; }
       else if (st.revealed) { cls = 'ghost'; txt = it.display; }
       else { cls = 'blank'; txt = it.display; }
-      if (pos === cur && S.focused) cls += ' cur';
+      if (pos === cur) cls += S.focused ? ' at cur' : ' at';
       if (it.kind === 'sep' && it.display === ' ') {
         html += `</span><span class="sp ${cls}">${cls.includes('bad') ? esc(txt) : ' '}</span><span class="w">`;
       } else html += `<span class="${cls}">${esc(txt)}</span>`;
@@ -350,6 +350,7 @@
     $('progress').textContent = total ? `${Math.min(S.target + 1, total)} / ${total}` : '';
     $('stat').textContent = st ? `오타 ${S.mistakes} · 힌트 ${S.hintCount}${st.revealed ? ' · 정답 봄' : ''}` : '';
     $('line').innerHTML = st ? renderLine(st) : '';
+    keepCursorVisible();
     $('practice').classList.toggle('done', !!S.completing);
     document.querySelectorAll('#tools button').forEach(b => {
       b.disabled = !S.ready || (!st && !['prev', 'replay'].includes(b.dataset.act));
@@ -369,13 +370,37 @@
     $('msg').textContent = m;
   }
 
-  // 폰 키보드가 올라오면 화면 높이에 맞춤 (아이폰 대응)
-  function fitViewport() {
-    const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-    document.documentElement.style.setProperty('--vh', h + 'px');
-    if (!$('practice').hidden) window.scrollTo(0, 0);
+  // 입력 위치가 항상 보이도록 문장 칸을 자동 스크롤 (여러 줄일 때)
+  function keepCursorVisible() {
+    const sc = $('lineScroll');
+    const c = sc.querySelector('.bad') || sc.querySelector('.at');
+    if (!c) { if (!S.typing || !S.typing.typed.length) sc.scrollTop = 0; return; }
+    const r = c.getBoundingClientRect(), s = sc.getBoundingClientRect();
+    const lineH = r.height || 30;
+    if (r.bottom > s.bottom - 6) sc.scrollTop += r.bottom - s.bottom + lineH * 0.6;
+    else if (r.top < s.top + 4) sc.scrollTop -= s.top - r.top + lineH * 0.3;
   }
-  if (window.visualViewport) window.visualViewport.addEventListener('resize', fitViewport);
+
+  // 폰 키보드가 올라오면 실제로 보이는 영역에 맞춤 (아이폰 대응)
+  const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  function fitViewport() {
+    const vv = window.visualViewport;
+    const h = vv ? vv.height : window.innerHeight;
+    document.documentElement.style.setProperty('--vh', h + 'px');
+    document.documentElement.style.setProperty('--vt', (vv ? vv.offsetTop : 0) + 'px');
+    keepCursorVisible();
+  }
+  function onFocusChange() {
+    document.documentElement.classList.toggle('kb', coarse && S.focused);
+    fitViewport();
+    [100, 350, 700].forEach(ms => setTimeout(fitViewport, ms)); // 키보드 애니메이션 후 다시 계산
+  }
+  typer.addEventListener('focus', onFocusChange);
+  typer.addEventListener('blur', onFocusChange);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', fitViewport);
+    window.visualViewport.addEventListener('scroll', fitViewport);
+  }
   window.addEventListener('resize', fitViewport);
 
   renderRecent();
