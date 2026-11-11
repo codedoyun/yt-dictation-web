@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube 받아쓰기
 // @namespace    https://github.com/codedoyun
-// @version      0.1.7
+// @version      0.1.8
 // @description  유튜브 영어 대사를 듣고 한 글자씩 받아쓰는 듣기 연습
 // @match        https://m.youtube.com/*
 // @match        https://www.youtube.com/*
@@ -610,7 +610,9 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
 #ytd-panel .ghost, #ytd-panel .sepb { color: #5b6474; }
 #ytd-panel .cur::after { content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 3px; background: #3b82f6; animation: ytdblink 1s steps(1) infinite; }
 @keyframes ytdblink { 50% { opacity: 0; } }
-#ytd-panel .ytd-ko { margin-top: 8px; font-size: 16px; line-height: 1.5; color: #a5b4fc; }
+#ytd-panel .ytd-ko { display: none; margin: 6px 10px 0; padding: 8px 12px; border-radius: 10px; background: #1e2240; color: #c7d2fe;
+  font-size: 15px; line-height: 1.5; max-height: 30%; overflow-y: auto; flex-shrink: 0; }
+#ytd-panel .ytd-ko.show { display: block; }
 #ytd-panel .ytd-msg { padding: 5px 14px; font-size: 13px; color: #8b93a3; flex-shrink: 0; min-height: 1.6em; }
 #ytd-panel.ytd-done .ytd-msg { color: #6ee7b7; font-weight: 700; }
 #ytd-panel .ytd-log { font-size: 11px; color: #6b7280; padding: 0 14px 4px; word-break: break-all; }
@@ -623,8 +625,9 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
 #ytd-panel.ytd-kb .ytd-bar { order: 0; padding: 3px 12px; }
 #ytd-panel.ytd-kb .ytd-msg { order: 1; padding: 0 14px 3px; font-size: 12px; min-height: 0; }
 #ytd-panel.ytd-kb .ytd-wrap { order: 2; }
-#ytd-panel.ytd-kb .ytd-log { order: 3; }
-#ytd-panel.ytd-kb .ytd-tools { order: 4; padding: 5px 10px 5px; }
+#ytd-panel.ytd-kb .ytd-ko { order: 3; }
+#ytd-panel.ytd-kb .ytd-log { order: 4; }
+#ytd-panel.ytd-kb .ytd-tools { order: 5; padding: 5px 10px 5px; }
 #ytd-panel.ytd-kb .ytd-tools button { padding: 6px 0; }
 #ytd-panel .ytd-scroll { overscroll-behavior: contain; }
 `;
@@ -643,7 +646,7 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
     const x = el('button', 'ytd-x', '✕'); x.type = 'button'; x.addEventListener('click', () => toggle(false));
     bar.append(ui.prog, ui.stat, x);
     const wrap = el('div', 'ytd-wrap'); ui.scroll = el('div', 'ytd-scroll'); ui.line = el('div', 'ytd-line'); ui.ko = el('div', 'ytd-ko');
-    ui.scroll.append(ui.line, ui.ko);
+    ui.scroll.append(ui.line);
     ui.input = el('input', 'ytd-in');
     Object.assign(ui.input, { type: 'text', autocomplete: 'off', spellcheck: false });
     ui.input.setAttribute('autocorrect', 'off'); ui.input.setAttribute('autocapitalize', 'off'); ui.input.setAttribute('enterkeyhint', 'go');
@@ -657,12 +660,21 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
       ui.tools.appendChild(b);
     });
     ui.canvas = el('canvas', 'ytd-mini');
-    panel.append(ui.canvas, bar, wrap, ui.msg, ui.log, ui.tools);
+    panel.append(ui.canvas, bar, wrap, ui.ko, ui.msg, ui.log, ui.tools);
     // 패널 터치가 유튜브 쪽으로 전달되지 않게
     ['click', 'touchstart', 'touchend', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'keydown', 'keyup', 'keypress'].forEach(t =>
       panel.addEventListener(t, e => e.stopPropagation()));
 
-    panel.addEventListener('touchmove', e => { if (!ui.scroll.contains(e.target) || panel.classList.contains('ytd-kb')) e.preventDefault(); }, { passive: false });
+    let touchY = null, touchEl = null;
+    panel.addEventListener('touchstart', e => {
+      const t = e.target;
+      touchEl = (t === ui.input || ui.scroll.contains(t)) ? ui.scroll : ui.ko.contains(t) ? ui.ko : null;
+      touchY = e.touches[0].clientY;
+    }, { passive: true });
+    panel.addEventListener('touchmove', e => {
+      e.preventDefault(); // 뒤의 유튜브 페이지가 같이 움직이지 않게
+      if (touchEl && touchY != null) { const y = e.touches[0].clientY; touchEl.scrollTop += touchY - y; touchY = y; }
+    }, { passive: false });
     ui.input.addEventListener('input', sync);
     ui.input.addEventListener('compositionstart', () => { S.composing = true; });
     ui.input.addEventListener('compositionend', () => { S.composing = false; sync(); });
@@ -939,6 +951,8 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
     ui.ko.textContent = ready && st && S.showKo
       ? (seg && seg.ko ? seg.ko : S.koState === 'loading' ? '한글 해석 불러오는 중…' : '이 영상은 한글 해석을 가져오지 못했어요')
       : '';
+    ui.ko.classList.toggle('show', !!ui.ko.textContent);
+    if (ui.ko.textContent) { ui.ko.scrollTop = 0; keepCursorVisible(); }
     keepCursorVisible();
     panel.classList.toggle('ytd-done', !!S.completing);
     ui.tools.querySelectorAll('button').forEach(b => { b.disabled = !ready || (!st && !['prev', 'replay'].includes(b.dataset.act)); });

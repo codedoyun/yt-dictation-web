@@ -40,6 +40,8 @@ def run(b, p, mode, force_content=False, full=False):
         page.click('#ytd-panel button[data-act=ko]')
         ko = E(page, 'return document.querySelector("#ytd-panel .ytd-ko").textContent')
         print('  해석:', ko); assert ko == '안녕, 세상아!', ko
+        vis = E(page, 'const k=document.querySelector("#ytd-panel .ytd-ko").getBoundingClientRect(), p=document.getElementById("ytd-panel").getBoundingClientRect(); return [k.top, k.bottom, k.height, p.top, p.bottom]')
+        assert vis[2] > 20 and vis[0] >= vis[3] and vis[1] <= vis[4], vis
         page.click('#ytd-panel button[data-act=ko]')
     wait(page, '__ytdUS.S.awaiting')
     t = E(page, 'return document.querySelector("video").currentTime'); assert 3.05 <= t <= 3.3, t
