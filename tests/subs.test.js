@@ -69,3 +69,23 @@ for (const u of [`https://www.youtube.com/watch?v=${id}&t=10s`, `https://youtu.b
 }
 assert.strictEqual(parseVideoId('https://example.com/watch?v=x'), null);
 console.log('subs tests passed');
+
+// TED 자막 제작자 표시 제거
+{
+  const r2 = parseSubtitles(`1
+00:00:00,000 --> 00:00:07,000
+Transcriber: Cristina Munoz
+Reviewer: Raul Higareda
+
+2
+00:00:07,500 --> 00:00:10,000
+Picture this, you're going on a boat trip,
+
+3
+00:00:10,000 --> 00:00:12,000
+and the sea is calm.`);
+  assert.deepStrictEqual(r2.segments.map(s => s.text), ["Picture this, you're going on a boat trip, and the sea is calm."]);
+  const r3 = parseSubtitles('0:00\nTranscriber: A B Reviewer: C D\n0:07\nPicture this.');
+  assert.deepStrictEqual(r3.segments.map(s => s.text), ['Picture this.']);
+  console.log('credit tests passed');
+}

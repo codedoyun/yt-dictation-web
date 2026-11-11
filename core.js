@@ -114,10 +114,14 @@
     return raw;
   }
 
+  // TED 등 자막 맨 앞의 제작자 표시 (대사가 아님)
+  const CREDIT_RE = /^\s*(transcriber|translator|reviewer|transcription|subtitles?\s+(by|and)|captions?\s+(by|and)|caption(ing|s)?\s+by|synced\s+(and|&)|corrected\s+by|subtitle\s+edit)\b/i;
+
   function segmentCues(cues) {
     const out = [];
     let cur = null;
     const wc = t => cleanText(t).split(' ').filter(Boolean).length;
+    cues = cues.filter(c => !CREDIT_RE.test(c.text));
     for (let i = 0; i < cues.length; i++) {
       const c = cues[i];
       const startsNewSpeaker = /^\s*(>>|-\s)/.test(c.text);
