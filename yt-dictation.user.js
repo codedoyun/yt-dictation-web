@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube 받아쓰기
 // @namespace    https://github.com/codedoyun
-// @version      0.1.2
+// @version      0.1.3
 // @description  유튜브 영어 대사를 듣고 한 글자씩 받아쓰는 듣기 연습
 // @match        https://m.youtube.com/*
 // @match        https://www.youtube.com/*
@@ -254,9 +254,10 @@
     const pos = st.typed.length;
     const exp = expectedAt(st, pos);
     if (matches(exp, ch)) { st.typed.push({ ch, ok: true }); return 'ok'; }
-    // 띄어쓰기를 깜빡하고 다음 단어 첫 글자를 친 경우 → 자동으로 띄어쓰기 채움
-    if (exp && exp.kind === 'sep' && ch !== ' ' && matches(expectedAt(st, pos + 1), ch)) {
-      st.typed.push({ ch: ' ', ok: true, auto: true });
+    // 띄어쓰기나 아포스트로피(don't의 ')를 건너뛰고 다음 글자를 친 경우 → 자동으로 채움
+    const skippable = exp && (exp.kind === 'sep' || exp.expect === "'");
+    if (skippable && ch !== ' ' && matches(expectedAt(st, pos + 1), ch)) {
+      st.typed.push({ ch: exp.kind === 'sep' ? ' ' : "'", ok: true, auto: true });
       st.typed.push({ ch, ok: true });
       return 'ok';
     }

@@ -89,3 +89,19 @@ and the sea is calm.`);
   assert.deepStrictEqual(r3.segments.map(s => s.text), ['Picture this.']);
   console.log('credit tests passed');
 }
+
+// 아포스트로피 생략 자동 채움
+{
+  const C = require('../core.js');
+  const st = C.createTyping("You're right, I don't know.");
+  for (const ch of 'youre right i dont know') C.typeChar(st, ch);
+  assert.ok(C.isComplete(st), 'apostrophe auto-fill');
+  const st2 = C.createTyping("I don't");
+  for (const ch of "i don't") C.typeChar(st2, ch);
+  assert.ok(C.isComplete(st2), 'typed apostrophe still works');
+  const st3 = C.createTyping("don't");
+  for (const ch of 'dont') C.typeChar(st3, ch);
+  C.backspace(st3); // t 지우면 자동 ' 도 같이 지워짐
+  assert.strictEqual(st3.typed.length, 3);
+  console.log('apostrophe tests passed');
+}
