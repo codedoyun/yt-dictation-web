@@ -69,9 +69,10 @@ def run(b, p, mode, force_content=False, full=False):
         # 키보드가 올라온 상태 흉내 → 화면 맨 위에 고정, 버튼이 문장 칸 위에, 아래 64px 비움
         E(page, 'document.querySelector("#ytd-panel .ytd-in").focus(); window.__ytdKb = true;')
         page.wait_for_function('() => document.getElementById("ytd-panel").classList.contains("ytd-kb")')
-        geo = E(page, 'const P=document.getElementById("ytd-panel").getBoundingClientRect(), T=document.querySelector("#ytd-panel .ytd-tools").getBoundingClientRect(), W=document.querySelector("#ytd-panel .ytd-wrap").getBoundingClientRect(); return {pt:P.top, pb:P.bottom, tb:T.bottom, wt:W.top, h:visualViewport.height}')
+        geo = E(page, 'const P=document.getElementById("ytd-panel").getBoundingClientRect(), T=document.querySelector("#ytd-panel .ytd-tools").getBoundingClientRect(), W=document.querySelector("#ytd-panel .ytd-wrap").getBoundingClientRect(); return {pt:P.top, pb:P.bottom, tt:T.top, tb:T.bottom, wb:W.bottom, h:visualViewport.height}')
         print('kb layout', geo)
-        assert abs(geo['pt']) < 1 and geo['tb'] <= geo['wt'] and abs(geo['pb'] - geo['h']) < 2, geo
+        # 버튼이 문장 칸 아래, 화면(키보드 위) 맨 아래에 붙어 있어야 함
+        assert abs(geo['pt']) < 1 and geo['tt'] >= geo['wb'] and abs(geo['tb'] - geo['h']) < 2 and abs(geo['pb'] - geo['h']) < 2, geo
         mini = E(page, 'const c=document.querySelector("#ytd-panel .ytd-mini"); return [getComputedStyle(c).display, c.width, c.clientHeight]')
         print('mini video', mini)
         assert mini[0] == 'block' and mini[1] > 0 and mini[2] > 50, mini

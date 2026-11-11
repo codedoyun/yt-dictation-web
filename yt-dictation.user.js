@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube 받아쓰기
 // @namespace    https://github.com/codedoyun
-// @version      0.1.6
+// @version      0.1.7
 // @description  유튜브 영어 대사를 듣고 한 글자씩 받아쓰는 듣기 연습
 // @match        https://m.youtube.com/*
 // @match        https://www.youtube.com/*
@@ -621,11 +621,10 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
 #ytd-panel .ytd-mini { display: none; width: 100%; background: #000; flex-shrink: 0; }
 #ytd-panel.ytd-kb .ytd-mini { display: block; order: -1; }
 #ytd-panel.ytd-kb .ytd-bar { order: 0; padding: 3px 12px; }
-#ytd-panel.ytd-kb .ytd-tools { order: 1; padding: 0 10px 4px; }
-#ytd-panel.ytd-kb .ytd-msg { order: 2; padding: 0 14px 3px; font-size: 12px; min-height: 0; }
-#ytd-panel.ytd-kb .ytd-wrap { order: 3; margin-bottom: 4px; }
-#ytd-panel.ytd-kb .ytd-log { order: 4; }
-#ytd-panel.ytd-kb .ytd-scroll { padding-bottom: var(--ytd-kbpad, 0px); }
+#ytd-panel.ytd-kb .ytd-msg { order: 1; padding: 0 14px 3px; font-size: 12px; min-height: 0; }
+#ytd-panel.ytd-kb .ytd-wrap { order: 2; }
+#ytd-panel.ytd-kb .ytd-log { order: 3; }
+#ytd-panel.ytd-kb .ytd-tools { order: 4; padding: 5px 10px 5px; }
 #ytd-panel.ytd-kb .ytd-tools button { padding: 6px 0; }
 #ytd-panel .ytd-scroll { overscroll-behavior: contain; }
 `;
@@ -700,7 +699,6 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
     // 키보드가 올라와 있으면: 화면(보이는 영역) 전체에 고정, 버튼은 위쪽에 → 스크롤해도 안 움직이고 키보드 위 바에 안 가려짐
     const kb = !!(S.focused && vv && (window.innerHeight - vH > 120 || window.__ytdKb));
     panel.classList.toggle('ytd-kb', kb);
-    panel.style.setProperty('--ytd-kbpad', IS_IOS ? '64px' : '0px');
     if (kb) {
       panel.style.top = vTop + 'px';
       panel.style.height = Math.max(160, vH) + 'px';
@@ -924,7 +922,7 @@ html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd
     const c = sc.querySelector('.bad') || sc.querySelector('.at');
     if (!c) { sc.scrollTop = 0; return; }
     const r = c.getBoundingClientRect(), s = sc.getBoundingClientRect();
-    const pad = panel.classList.contains('ytd-kb') && IS_IOS ? 64 : 0;
+    const pad = 0;
     if (r.bottom > s.bottom - 6 - pad) sc.scrollTop += r.bottom - (s.bottom - pad) + r.height * 0.6;
     else if (r.top < s.top + 4) sc.scrollTop -= s.top - r.top + r.height * 0.3;
   }
