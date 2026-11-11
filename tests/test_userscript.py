@@ -68,7 +68,7 @@ def run(b, p, mode, force_content=False, full=False):
 try:
     with sync_playwright() as p:
         b = p.chromium.launch(executable_path='/usr/bin/google-chrome', headless=True, args=['--autoplay-policy=no-user-gesture-required'])
-        run(b, p, 'ok', full=True)
+        run(b, p, 'ok', full=True, force_content=True)
         run(b, p, 'pot')
         run(b, p, 'none')
         run(b, p, 'pot', force_content=True)

@@ -13,7 +13,7 @@ const header = `// ==UserScript==
 // @match        https://m.youtube.com/*
 // @match        https://www.youtube.com/*
 // @run-at       document-start
-// @inject-into  auto
+// @inject-into  content
 // @noframes
 // @grant        none
 // @updateURL    ${URL}

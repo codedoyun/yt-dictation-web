@@ -195,7 +195,7 @@
   // ================= 3. 화면 =================
   const CSS = `
 html.ytd-on .ytp-caption-window-container, html.ytd-on .caption-window, html.ytd-on .ytp-caption-segment { display: none !important; }
-#ytd-fab { position: fixed; right: 14px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 2147483000;
+#ytd-fab { position: fixed; right: 14px; bottom: calc(96px + env(safe-area-inset-bottom)); z-index: 2147483000;
   padding: 11px 16px; border-radius: 999px; border: 0; background: #2563eb; color: #fff; font: 700 15px/1 -apple-system, system-ui, sans-serif;
   box-shadow: 0 4px 16px rgba(0,0,0,.35); -webkit-tap-highlight-color: transparent; }
 #ytd-panel { position: fixed; left: 0; right: 0; z-index: 2147483001; display: flex; flex-direction: column; background: #0b0d12; color: #e8eaef;
