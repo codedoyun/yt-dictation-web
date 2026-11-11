@@ -25,3 +25,12 @@
 ## 테스트 (개발용)
 - `node tests/subs.test.js`
 - 브라우저 테스트: `ffmpeg -f lavfi -i testsrc=size=1280x720:rate=25 -t 30 -c:v libvpx-vp9 -g 25 tests/video.webm` 로 테스트 영상을 만든 뒤 `python3 tests/test_web.py`
+
+## 아이폰 사파리용 스크립트 (자막 자동 + 프리미엄 광고 없음)
+`yt-dictation.user.js` — 사파리의 유튜브 사이트(m.youtube.com) 위에서 바로 돌아가는 버전. 자막을 유튜브 페이지 안에서 직접 가져옴.
+1. 앱스토어에서 **Userscripts** 설치 → 설정 > 사파리 > 확장 프로그램에서 켜고 youtube.com 권한 허용
+2. 사파리로 https://codedoyun.github.io/yt-dictation-web/yt-dictation.user.js 열기 → 주소창의 확장 프로그램 메뉴에서 Userscripts → 설치
+3. 사파리에서 유튜브 영상 열기 → 오른쪽 아래 **받아쓰기** 버튼
+
+- 소스: `userscript/main.js` (+ 공용 `core.js`). 수정 후 `node tools/build-userscript.js` 로 다시 만들기
+- 테스트: `python3 tests/test_userscript.py` (가짜 모바일 유튜브 페이지)
