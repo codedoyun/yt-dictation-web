@@ -1,0 +1,4 @@
+tests/*.png
+tests/video.webm
+__pycache__/
+.DS_Store

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#0b0d12">
+<title>유튜브 받아쓰기</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/192.png">
+<link rel="apple-touch-icon" href="icons/192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<section id="home">
+  <h1>유튜브 받아쓰기</h1>
+  <p class="sub">영어 대사를 듣고 한 글자씩 받아쓰며 듣기 연습</p>
+
+  <label for="url">1. 유튜브 링크</label>
+  <input id="url" type="url" inputmode="url" placeholder="https://youtu.be/..." autocomplete="off">
+  <p id="savedNote" class="note" hidden>✓ 이 영상은 저장된 자막이 있어서 바로 시작할 수 있어요</p>
+
+  <label>2. 영어 자막</label>
+  <div class="filerow">
+    <label class="btn" for="file">📄 자막 파일 선택</label>
+    <input id="file" type="file" accept=".srt,.vtt,.txt,.json,.xml,.sbv,text/plain" hidden>
+    <span id="fileName" class="note"></span>
+  </div>
+  <textarea id="subs" rows="5" placeholder="또는 자막 내용을 여기에 붙여넣기&#10;(SRT, VTT, 유튜브 '스크립트 표시' 복사본)"></textarea>
+
+  <p id="homeMsg" class="err"></p>
+  <button id="start" class="btn primary big">시작하기</button>
+
+  <div id="recentWrap" hidden>
+    <h2>최근 연습한 영상</h2>
+    <div id="recent"></div>
+  </div>
+
+  <details class="help">
+    <summary>자막은 어떻게 구하나요?</summary>
+    <p><b>PC</b> — 유튜브 영상 설명란 맨 아래 <b>'스크립트 표시'</b>를 누르고, 오른쪽에 나온 스크립트를 처음부터 끝까지 드래그해서 복사 → 위 칸에 붙여넣기. (시간 표시가 같이 복사돼야 해요)</p>
+    <p><b>휴대폰</b> — 인터넷에서 '유튜브 자막 다운로드' 사이트를 찾아 영상 링크를 넣고 <b>영어 SRT</b> 파일을 받은 뒤, '자막 파일 선택'으로 올리기.</p>
+    <p>사람이 직접 단 자막이 자동생성 자막보다 정확해요.</p>
+  </details>
+</section>
+
+<section id="practice" hidden>
+  <div id="videoWrap"><div id="player"></div></div>
+  <div id="bar">
+    <button id="back" class="icon" aria-label="처음 화면">←</button>
+    <span id="progress"></span>
+    <span id="stat"></span>
+  </div>
+  <div id="lineWrap">
+    <div id="line"></div>
+    <input id="typer" type="text" autocomplete="off" autocorrect="off" autocapitalize="off"
+           spellcheck="false" enterkeyhint="go" aria-label="받아쓰기 입력">
+  </div>
+  <div id="msg"></div>
+  <div id="tools">
+    <button data-act="replay">↺<span>다시 듣기</span></button>
+    <button data-act="slow">🐢<span>느리게</span></button>
+    <button data-act="hint">💡<span>한 글자</span></button>
+    <button data-act="reveal">👁<span>정답 보기</span></button>
+    <button data-act="prev">⏮<span>이전</span></button>
+    <button data-act="next">⏭<span>다음</span></button>
+  </div>
+</section>
+
+<script src="core.js"></script>
+<script src="subs.js"></script>
+<script src="player.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
